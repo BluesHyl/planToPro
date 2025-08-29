@@ -1,0 +1,642 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Vue 3 核心源码深度解析</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #0f2f3b 0%, #1a4d5c 100%);
+            color: #e0e0e0;
+            min-height: 100vh;
+            padding: 20px;
+            line-height: 1.6;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        header {
+            text-align: center;
+            margin-bottom: 40px;
+            padding: 30px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+        }
+        h1 {
+            font-size: 2.8rem;
+            margin-bottom: 10px;
+            color: #42b883;
+            text-shadow: 0 2px 10px rgba(66, 184, 131, 0.4);
+        }
+        .subtitle {
+            font-size: 1.2rem;
+            color: #a0a0a0;
+            max-width: 800px;
+            margin: 0 auto;
+        }
+        .tabs {
+            display: flex;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #3498db;
+        }
+        .tab {
+            padding: 12px 24px;
+            cursor: pointer;
+            background: rgba(20, 30, 40, 0.6);
+            margin-right: 5px;
+            border-top-left-radius: 8px;
+            border-top-right-radius: 8px;
+            transition: background 0.3s;
+        }
+        .tab.active {
+            background: #3498db;
+            color: white;
+            font-weight: bold;
+        }
+        .tab-content {
+            display: none;
+            background: rgba(20, 30, 40, 0.8);
+            border-radius: 0 15px 15px 15px;
+            padding: 30px;
+            box-shadow: 0 8px 25px rgba(0, 0, 0, 0.4);
+            margin-bottom: 30px;
+        }
+        .tab-content.active {
+            display: block;
+        }
+        h2 {
+            color: #3498db;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #3498db;
+        }
+        h3 {
+            color: #42b883;
+            margin: 25px 0 15px;
+        }
+        p {
+            margin-bottom: 15px;
+        }
+        .demo-area {
+            margin: 25px 0;
+            padding: 20px;
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 10px;
+        }
+        .reactive-demo {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        .input-group {
+            display: flex;
+            gap: 10px;
+        }
+        input, button {
+            padding: 10px 15px;
+            border: none;
+            border-radius: 5px;
+            background: rgba(255, 255, 255, 0.1);
+            color: white;
+            outline: none;
+        }
+        input {
+            flex: 1;
+            border: 1px solid #3498db;
+        }
+        input:focus {
+            background: rgba(255, 255, 255, 0.15);
+        }
+        button {
+            background: #3498db;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        button:hover {
+            background: #2980b9;
+        }
+        .output {
+            min-height: 50px;
+            padding: 15px;
+            background: rgba(0, 0, 0, 0.3);
+            border-radius: 5px;
+            border-left: 4px solid #42b883;
+        }
+        .code-block {
+            background: rgba(0, 0, 0, 0.3);
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+            font-family: 'Fira Code', monospace;
+            font-size: 0.95rem;
+            line-height: 1.5;
+        }
+        .code-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 10px;
+            color: #7f8c8d;
+        }
+        .code-lang {
+            font-weight: bold;
+            color: #42b883;
+        }
+        .highlight {
+            color: #e74c3c;
+            font-weight: bold;
+        }
+        .comment {
+            color: #7f8c8d;
+        }
+        .keyword {
+            color: #3498db;
+        }
+        .function {
+            color: #f1c40f;
+        }
+        .property {
+            color: #9b59b6;
+        }
+        .string {
+            color: #2ecc71;
+        }
+        ul, ol {
+            margin-left: 20px;
+            margin-bottom: 20px;
+        }
+        li {
+            margin-bottom: 8px;
+        }
+        .comparison {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 20px;
+            margin: 25px 0;
+        }
+        .comparison-item {
+            background: rgba(0, 0, 0, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+        }
+        .comparison-title {
+            text-align: center;
+            margin-bottom: 15px;
+            color: #f1c40f;
+            font-weight: bold;
+        }
+        footer {
+            text-align: center;
+            margin-top: 40px;
+            padding: 20px;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        @media (max-width: 900px) {
+            .tabs {
+                flex-wrap: wrap;
+            }
+            .tab {
+                margin-bottom: 5px;
+            }
+            .comparison {
+                grid-template-columns: 1fr;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Vue 3 核心源码深度解析</h1>
+            <p class="subtitle">深入探索Vue 3的响应式系统、虚拟DOM、编译优化和组合式API的实现原理</p>
+        </header>
+
+        <div class="tabs">
+            <div class="tab active" data-tab="reactivity">响应式系统</div>
+            <div class="tab" data-tab="vdom">虚拟DOM</div>
+            <div class="tab" data-tab="compiler">编译器</div>
+            <div class="tab" data-tab="composition">组合式API</div>
+        </div>
+
+        <div class="tab-content active" id="reactivity">
+            <h2>响应式系统：Proxy 与 Reflect</h2>
+            <p>Vue 3 使用 ES6 的 Proxy 替代了 Vue 2 中的 Object.defineProperty，提供了更强大的拦截能力。</p>
+            
+            <div class="demo-area">
+                <h3>响应式原理演示</h3>
+                <div class="reactive-demo">
+                    <div class="input-group">
+                        <input type="text" id="inputMessage" placeholder="输入消息...">
+                        <button id="btnUpdate">更新</button>
+                    </div>
+                    <div class="output" id="outputMessage">
+                        初始消息
+                    </div>
+                </div>
+            </div>
+
+            <h3>Proxy 实现原理</h3>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-lang">JavaScript</span>
+                    <span>reactivity.js</span>
+                </div>
+                <pre><code><span class="keyword">function</span> <span class="function">reactive</span>(obj) {
+  <span class="keyword">return</span> <span class="keyword">new</span> Proxy(obj, {
+    <span class="function">get</span>(target, key, receiver) {
+      <span class="comment">// 跟踪依赖</span>
+      <span class="function">track</span>(target, key);
+      <span class="keyword">const</span> result = Reflect.get(target, key, receiver);
+      <span class="comment">// 深层响应式</span>
+      <span class="keyword">if</span> (<span class="keyword">typeof</span> result === <span class="string">'object'</span> && result !== <span class="keyword">null</span>) {
+        <span class="keyword">return</span> <span class="function">reactive</span>(result);
+      }
+      <span class="keyword">return</span> result;
+    },
+    <span class="function">set</span>(target, key, value, receiver) {
+      <span class="keyword">const</span> oldValue = target[key];
+      <span class="keyword">const</span> result = Reflect.set(target, key, value, receiver);
+      <span class="comment">// 触发更新（避免重复触发）</span>
+      <span class="keyword">if</span> (!Object.is(oldValue, value)) {
+        <span class="function">trigger</span>(target, key);
+      }
+      <span class="keyword">return</span> result;
+    },
+    <span class="function">deleteProperty</span>(target, key) {
+      <span class="keyword">const</span> hadKey = Object.prototype.hasOwnProperty.call(target, key);
+      <span class="keyword">const</span> result = Reflect.deleteProperty(target, key);
+      <span class="keyword">if</span> (hadKey) {
+        <span class="function">trigger</span>(target, key);
+      }
+      <span class="keyword">return</span> result;
+    }
+  });
+}</code></pre>
+            </div>
+
+            <h3>依赖收集与触发</h3>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-lang">JavaScript</span>
+                    <span>effect.js</span>
+                </div>
+                <pre><code><span class="keyword">let</span> activeEffect = <span class="keyword">null</span>;
+<span class="keyword">const</span> targetMap = <span class="keyword">new</span> WeakMap();
+
+<span class="keyword">function</span> <span class="function">track</span>(target, key) {
+  <span class="keyword">if</span> (!activeEffect) <span class="keyword">return</span>;
+  
+  <span class="keyword">let</span> depsMap = targetMap.get(target);
+  <span class="keyword">if</span> (!depsMap) {
+    targetMap.set(target, (depsMap = <span class="keyword">new</span> Map()));
+  }
+  
+  <span class="keyword">let</span> dep = depsMap.get(key);
+  <span class="keyword">if</span> (!dep) {
+    depsMap.set(key, (dep = <span class="keyword">new</span> Set()));
+  }
+  
+  dep.add(activeEffect);
+}
+
+<span class="keyword">function</span> <span class="function">trigger</span>(target, key) {
+  <span class="keyword">const</span> depsMap = targetMap.get(target);
+  <span class="keyword">if</span> (!depsMap) <span class="keyword">return</span>;
+  
+  <span class="keyword">const</span> dep = depsMap.get(key);
+  <span class="keyword">if</span> (dep) {
+    dep.forEach(effect => effect());
+  }
+}
+
+<span class="keyword">function</span> <span class="function">effect</span>(fn) {
+  activeEffect = fn;
+  fn();
+  activeEffect = <span class="keyword">null</span>;
+}</code></pre>
+            </div>
+        </div>
+
+        <div class="tab-content" id="vdom">
+            <h2>虚拟DOM与渲染器</h2>
+            <p>Vue 3 的虚拟DOM进行了重写，优化了渲染性能并减少了内存占用。</p>
+            
+            <h3>VNode 结构</h3>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-lang">TypeScript</span>
+                    <span>vnode.ts</span>
+                </div>
+                <pre><code><span class="keyword">interface</span> VNode {
+  type: string | Symbol | Component;
+  props: Record&lt;string, any&gt; | null;
+  children: string | Array&lt;VNode&gt; | null;
+  el: Element | null;
+  key: string | number | symbol | null;
+  shapeFlag: number;
+  patchFlag: number;
+}
+
+<span class="keyword">function</span> <span class="function">createVNode</span>(type, props = null, children = null) {
+  <span class="keyword">const</span> shapeFlag = <span class="function">getShapeFlag</span>(type);
+  <span class="keyword">const</span> vnode: VNode = {
+    type,
+    props,
+    children,
+    el: null,
+    key: props?.key ?? null,
+    shapeFlag,
+    patchFlag: props ? -1 : 0
+  };
+  
+  <span class="comment">// 标准化子节点</span>
+  <span class="keyword">if</span> (children) {
+    vnode.shapeFlag |= <span class="function">isArray</span>(children) 
+      ? ShapeFlags.ARRAY_CHILDREN 
+      : ShapeFlags.TEXT_CHILDREN;
+  }
+  
+  <span class="keyword">return</span> vnode;
+}</code></pre>
+            </div>
+
+            <h3>Patch 算法优化</h3>
+            <p>Vue 3 通过编译时的静态标记和优化，减少了运行时比较的工作量：</p>
+            <ul>
+                <li><strong>静态节点提升</strong>：将静态节点提升到渲染函数外部，避免重复创建</li>
+                <li><strong>Patch flag</strong>：标记动态属性类型，减少比较次数</li>
+                <li><strong>缓存事件处理函数</strong>：避免不必要的更新</li>
+                <li><strong>树状结构优化</strong>：基于动态节点的嵌套层级优化Diff算法</li>
+            </ul>
+
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-lang">JavaScript</span>
+                    <span>renderer.js</span>
+                </div>
+                <pre><code><span class="keyword">function</span> <span class="function">patch</span>(n1, n2, container) {
+  <span class="comment">// 如果旧节点不存在，直接挂载新节点</span>
+  <span class="keyword">if</span> (!n1) {
+    <span class="function">mount</span>(n2, container);
+  } <span class="keyword">else</span> {
+    <span class="function">patchVNode</span>(n1, n2);
+  }
+}
+
+<span class="keyword">function</span> <span class="function">patchVNode</span>(n1, n2) {
+  <span class="comment">// 如果类型不同，直接替换</span>
+  <span class="keyword">if</span> (n1.type !== n2.type) {
+    <span class="function">replaceNode</span>(n1, n2);
+    <span class="keyword">return</span>;
+  }
+  
+  <span class="keyword">const</span> el = (n2.el = n1.el);
+  <span class="keyword">const</span> oldProps = n1.props || {};
+  <span class="keyword">const</span> newProps = n2.props || {};
+  
+  <span class="comment">// 根据 patchFlag 进行优化处理</span>
+  <span class="keyword">if</span> (n2.patchFlag > 0) {
+    <span class="comment">// 只更新有变化的属性</span>
+    <span class="keyword">for</span> (<span class="keyword">const</span> key <span class="keyword">in</span> newProps) {
+      <span class="keyword">if</span> (oldProps[key] !== newProps[key]) {
+        <span class="function">patchProp</span>(el, key, oldProps[key], newProps[key]);
+      }
+    }
+  } <span class="keyword">else</span> {
+    <span class="comment">// 全量比较</span>
+    <span class="function">patchProps</span>(el, oldProps, newProps);
+  }
+  
+  <span class="comment">// 更新子节点</span>
+  <span class="function">patchChildren</span>(n1, n2, el);
+}</code></pre>
+            </div>
+        </div>
+
+        <div class="tab-content" id="compiler">
+            <h2>编译器优化</h2>
+            <p>Vue 3 的编译器进行了彻底重写，提供了更好的性能和更多的优化机会。</p>
+            
+            <h3>模板编译过程</h3>
+            <ol>
+                <li><strong>解析</strong>：将模板字符串解析为抽象语法树（AST）</li>
+                <li><strong>转换</strong>：对AST进行优化和转换</li>
+                <li><strong>代码生成</strong>：将AST生成渲染函数代码</li>
+            </ol>
+
+            <div class="comparison">
+                <div class="comparison-item">
+                    <div class="comparison-title">Vue 2 编译输出</div>
+                    <div class="code-block">
+                        <pre><code><span class="keyword">function</span> <span class="function">render</span>() {
+  <span class="keyword">with</span>(<span class="keyword">this</span>) {
+    <span class="keyword">return</span> _c(<span class="string">'div'</span>, 
+      _ssrList(items, <span class="function">function</span>(item) {
+        <span class="keyword">return</span> _c(<span class="string">'p'</span>, [_v(_s(item))]);
+      })
+    );
+  }
+}</code></pre>
+                    </div>
+                </div>
+                <div class="comparison-item">
+                    <div class="comparison-title">Vue 3 编译输出</div>
+                    <div class="code-block">
+                        <pre><code><span class="keyword">import</span> { createVNode <span class="keyword">as</span> _createVNode } <span class="keyword">from</span> <span class="string">"vue"</span>;
+
+<span class="keyword">const</span> _hoisted_1 = <span class="function">_createVNode</span>(<span class="string">"p"</span>, <span class="keyword">null</span>, <span class="string">"静态内容"</span>, -1);
+
+<span class="keyword">function</span> <span class="function">render</span>(_ctx, _cache) {
+  <span class="keyword">return</span> _createVNode(<span class="string">"div"</span>, <span class="keyword">null</span>, [
+    _hoisted_1,
+    _createVNode(<span class="string">"p"</span>, <span class="keyword">null</span>, _toDisplayString(_ctx.message), 1)
+  ]);
+}</code></pre>
+                    </div>
+                </div>
+            </div>
+
+            <h3>编译优化特性</h3>
+            <ul>
+                <li><strong>静态节点提升</strong>：将静态内容提取到渲染函数外部</li>
+                <li><strong>Patch flags</strong>：标记动态节点类型（文本、类、样式等）</li>
+                <li><strong>树结构打平</strong>：减少嵌套节点的递归开销</li>
+                <li><strong>缓存事件处理程序</strong>：避免不必要的重新渲染</li>
+                <li><strong>SSR 优化</strong>：服务端渲染时的字符串拼接优化</li>
+            </ul>
+        </div>
+
+        <div class="tab-content" id="composition">
+            <h2>组合式API</h2>
+            <p>组合式API是Vue 3最重要的特性之一，它提供了更好的逻辑组织和复用能力。</p>
+            
+            <h3>基本使用</h3>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-lang">JavaScript</span>
+                    <span>Component.vue</span>
+                </div>
+                <pre><code><span class="keyword">import</span> { ref, computed, onMounted, watch } <span class="keyword">from</span> <span class="string">'vue'</span>;
+
+<span class="keyword">export</span> <span class="keyword">default</span> {
+  <span class="function">setup</span>(props, { emit }) {
+    <span class="comment">// 响应式状态</span>
+    <span class="keyword">const</span> count = <span class="function">ref</span>(0);
+    <span class="keyword">const</span> double = <span class="function">computed</span>(() => count.value * 2);
+    
+    <span class="comment">// 方法</span>
+    <span class="keyword">function</span> <span class="function">increment</span>() {
+      count.value++;
+      emit(<span class="string">'increment'</span>, count.value);
+    }
+    
+    <span class="comment">// 生命周期钩子</span>
+    <span class="function">onMounted</span>(() => {
+      console.log(<span class="string">'组件已挂载'</span>);
+    });
+    
+    <span class="comment">// 侦听器</span>
+    <span class="function">watch</span>(count, (newValue, oldValue) => {
+      console.log(<span class="string">`count从<span class="highlight">${oldValue}</span>变为<span class="highlight">${newValue}</span>`</span>);
+    });
+    
+    <span class="comment">// 返回模板使用的数据和方法</span>
+    <span class="keyword">return</span> {
+      count,
+      double,
+      increment
+    };
+  }
+};</code></pre>
+            </div>
+
+            <h3>逻辑复用：自定义Hook</h3>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-lang">JavaScript</span>
+                    <span>useCounter.js</span>
+                </div>
+                <pre><code><span class="keyword">import</span> { ref, computed } <span class="keyword">from</span> <span class="string">'vue'</span>;
+
+<span class="keyword">export</span> <span class="keyword">default</span> <span class="keyword">function</span> <span class="function">useCounter</span>(initialValue = 0) {
+  <span class="keyword">const</span> count = <span class="function">ref</span>(initialValue);
+  
+  <span class="keyword">const</span> double = <span class="function">computed</span>(() => count.value * 2);
+  <span class="keyword">const</span> increment = () => count.value++;
+  <span class="keyword">const</span> decrement = () => count.value--;
+  <span class="keyword">const</span> reset = () => count.value = initialValue;
+  
+  <span class="keyword">return</span> {
+    count,
+    double,
+    increment,
+    decrement,
+    reset
+  };
+}</code></pre>
+            </div>
+
+            <h3>响应式工具函数</h3>
+            <div class="code-block">
+                <div class="code-header">
+                    <span class="code-lang">JavaScript</span>
+                    <span>utils.js</span>
+                </div>
+                <pre><code><span class="keyword">import</span> { reactive, toRefs, toRef, isProxy, isReactive } <span class="keyword">from</span> <span class="string">'vue'</span>;
+
+<span class="comment">// 将响应式对象转换为普通对象，但保持响应式连接</span>
+<span class="keyword">const</span> state = <span class="function">reactive</span>({ count: 0 });
+<span class="keyword">const</span> plainState = <span class="function">toRefs</span>(state);
+
+<span class="comment">// 为响应式对象的属性创建ref</span>
+<span class="keyword">const</span> countRef = <span class="function">toRef</span>(state, <span class="string">'count'</span>);
+
+<span class="comment">// 检查对象是否是响应式的</span>
+<span class="function">isProxy</span>(state); <span class="comment">// true</span>
+<span class="function">isReactive</span>(state); <span class="comment">// true</span></code></pre>
+            </div>
+        </div>
+
+        <footer>
+            <p>Vue 3 核心源码深度解析 - 本演示仅用于教学目的 | 基于 Vue 3.2+ 版本</p>
+        </footer>
+    </div>
+
+    <script>
+        // 选项卡切换功能
+        document.querySelectorAll('.tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // 移除所有active类
+                document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+                document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+                
+                // 添加active类到当前选项卡
+                tab.classList.add('active');
+                document.getElementById(tab.dataset.tab).classList.add('active');
+            });
+        });
+
+        // 简化的响应式实现
+        function createReactiveObject(obj) {
+            const dependents = new Map();
+            
+            return new Proxy(obj, {
+                get(target, key, receiver) {
+                    console.log(`获取属性 ${key}: ${target[key]}`);
+                    // 在实际Vue中，这里会进行依赖收集
+                    return Reflect.get(target, key, receiver);
+                },
+                set(target, key, value, receiver) {
+                    console.log(`设置属性 ${key} 为 ${value}`);
+                    const oldValue = target[key];
+                    const result = Reflect.set(target, key, value, receiver);
+                    
+                    // 在实际Vue中，这里会触发更新
+                    if (oldValue !== value) {
+                        if (key === 'message') {
+                            document.getElementById('outputMessage').textContent = value;
+                        }
+                        // 触发依赖更新
+                        if (dependents.has(key)) {
+                            dependents.get(key).forEach(effect => effect());
+                        }
+                    }
+                    
+                    return result;
+                }
+            });
+        }
+
+        // 创建响应式对象
+        const state = createReactiveObject({
+            message: '初始消息'
+        });
+
+        // 初始化UI
+        document.getElementById('outputMessage').textContent = state.message;
+        document.getElementById('inputMessage').value = state.message;
+
+        // 设置事件监听
+        document.getElementById('btnUpdate').addEventListener('click', () => {
+            const input = document.getElementById('inputMessage');
+            state.message = input.value;
+        });
+
+        document.getElementById('inputMessage').addEventListener('keyup', (event) => {
+            if (event.key === 'Enter') {
+                state.message = event.target.value;
+            }
+        });
+    </script>
+</body>
+</html>

@@ -1,0 +1,652 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Async/Await 实现原理</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        
+        body {
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            color: #333;
+            line-height: 1.6;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            overflow: hidden;
+        }
+        
+        header {
+            background: #2c3e50;
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        h1 {
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 1.2rem;
+            opacity: 0.8;
+        }
+        
+        .tabs {
+            display: flex;
+            background: #34495e;
+            overflow-x: auto;
+        }
+        
+        .tab-btn {
+            padding: 15px 25px;
+            background: none;
+            border: none;
+            color: #ecf0f1;
+            font-size: 1rem;
+            cursor: pointer;
+            transition: background 0.3s;
+            white-space: nowrap;
+        }
+        
+        .tab-btn:hover {
+            background: #415b76;
+        }
+        
+        .tab-btn.active {
+            background: #1abc9c;
+            font-weight: bold;
+        }
+        
+        .tab-content {
+            padding: 30px;
+            display: none;
+        }
+        
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.5s;
+        }
+        
+        @keyframes fadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
+        }
+        
+        h2 {
+            color: #2c3e50;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #eee;
+        }
+        
+        h3 {
+            color: #3498db;
+            margin: 25px 0 15px;
+        }
+        
+        p {
+            margin-bottom: 15px;
+        }
+        
+        .code-container {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 8px;
+            overflow-x: auto;
+            margin: 20px 0;
+            font-family: 'Fira Code', monospace;
+            font-size: 14px;
+            line-height: 1.5;
+        }
+        
+        .code-comment {
+            color: #75715e;
+        }
+        
+        .code-keyword {
+            color: #f92672;
+        }
+        
+        .code-function {
+            color: #66d9ef;
+        }
+        
+        .code-var {
+            color: #fd971f;
+        }
+        
+        .code-string {
+            color: #a6e22e;
+        }
+        
+        .comparison {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 20px;
+            margin: 30px 0;
+        }
+        
+        .comparison-item {
+            flex: 1;
+            min-width: 300px;
+            background: #f8f9fa;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .demo-box {
+            background: #f8f9fa;
+            padding: 25px;
+            border-radius: 8px;
+            margin: 30px 0;
+            box-shadow: 0 4px 8px rgba(0, 0, 0, 0.05);
+        }
+        
+        .demo-controls {
+            margin-bottom: 20px;
+        }
+        
+        button {
+            background: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            margin-right: 10px;
+            transition: background 0.3s;
+        }
+        
+        button:hover {
+            background: #2980b9;
+        }
+        
+        .output {
+            background: #2d2d2d;
+            color: #f8f8f2;
+            padding: 20px;
+            border-radius: 8px;
+            font-family: 'Fira Code', monospace;
+            min-height: 200px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+        }
+        
+        .execution-path {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 8px;
+        }
+        
+        .path-step {
+            display: flex;
+            align-items: center;
+            margin-bottom: 15px;
+            padding: 10px;
+            background: white;
+            border-radius: 5px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.05);
+        }
+        
+        .step-number {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 30px;
+            height: 30px;
+            background: #3498db;
+            color: white;
+            border-radius: 50%;
+            margin-right: 15px;
+            font-weight: bold;
+        }
+        
+        .step-active {
+            background: #2ecc71;
+        }
+        
+        .step-completed {
+            background: #95a5a6;
+        }
+        
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .legend-item {
+            display: flex;
+            align-items: center;
+            margin-right: 15px;
+        }
+        
+        .legend-color {
+            width: 20px;
+            height: 20px;
+            border-radius: 4px;
+            margin-right: 8px;
+        }
+        
+        .legend-sync {
+            background: #3498db;
+        }
+        
+        .legend-async {
+            background: #2ecc71;
+        }
+        
+        .legend-await {
+            background: #e74c3c;
+        }
+        
+        footer {
+            text-align: center;
+            padding: 20px;
+            background: #ecf0f1;
+            color: #7f8c8d;
+            font-size: 0.9rem;
+        }
+        
+        @media (max-width: 768px) {
+            .tabs {
+                flex-direction: column;
+            }
+            
+            .comparison {
+                flex-direction: column;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>Async/Await 实现原理</h1>
+            <p class="subtitle">深入理解 JavaScript 异步编程的终极解决方案</p>
+        </header>
+        
+        <div class="tabs">
+            <button class="tab-btn active" onclick="showTab(0)">实现原理</button>
+            <button class="tab-btn" onclick="showTab(1)">Generator 基础</button>
+            <button class="tab-btn" onclick="showTab(2)">Async/Await 转换</button>
+            <button class="tab-btn" onclick="showTab(3)">演示</button>
+        </div>
+        
+        <div class="tab-content active">
+            <h2>Async/Await 的实现原理</h2>
+            <p>Async/Await 是 ES2017 引入的异步编程解决方案，它实际上是 Generator 函数的语法糖，但增加了内置执行器。</p>
+            
+            <h3>核心原理</h3>
+            <p>Async 函数本质上是将 Generator 函数和自动执行器（co 模块）包装在一个函数中：</p>
+            
+            <div class="code-container">
+                <span class="code-comment">// Async/Await 代码</span><br>
+                <span class="code-keyword">async function</span> <span class="code-function">fetchData</span>() {<br>
+                &nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">data</span> = <span class="code-keyword">await</span> <span class="code-function">fetch</span>(<span class="code-string">'https://api.example.com/data'</span>);<br>
+                &nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-var">data</span>.<span class="code-function">json</span>();<br>
+                }<br>
+                <br>
+                <span class="code-comment">// 相当于下面的 Generator 函数 + 执行器</span><br>
+                <span class="code-keyword">function</span>* <span class="code-function">fetchDataGen</span>() {<br>
+                &nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">data</span> = <span class="code-keyword">yield</span> <span class="code-function">fetch</span>(<span class="code-string">'https://api.example.com/data'</span>);<br>
+                &nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-var">data</span>.<span class="code-function">json</span>();<br>
+                }<br>
+                <br>
+                <span class="code-comment">// 自动执行器</span><br>
+                <span class="code-keyword">function</span> <span class="code-function">runGenerator</span>(genFunc) {<br>
+                &nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">gen</span> = <span class="code-function">genFunc</span>();<br>
+                &nbsp;&nbsp;<span class="code-keyword">function</span> <span class="code-function">next</span>(value) {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">result</span> = gen.<span class="code-function">next</span>(value);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">if</span> (<span class="code-var">result</span>.done) <span class="code-keyword">return</span> <span class="code-function">Promise</span>.<span class="code-function">resolve</span>(<span class="code-var">result</span>.value);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-function">Promise</span>.<span class="code-function">resolve</span>(<span class="code-var">result</span>.value).<span class="code-function">then</span>(next);<br>
+                &nbsp;&nbsp;}<br>
+                &nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-function">next</span>();<br>
+                }<br>
+                <br>
+                <span class="code-comment">// 使用</span><br>
+                <span class="code-function">runGenerator</span>(fetchDataGen).<span class="code-function">then</span>(data => {<br>
+                &nbsp;&nbsp;<span class="code-function">console</span>.<span class="code-function">log</span>(data);<br>
+                });
+            </div>
+            
+            <h3>关键特性</h3>
+            <ul>
+                <li>Async 函数总是返回一个 Promise 对象</li>
+                <li>Await 关键字后面可以跟一个 Promise 对象或任何值</li>
+                <li>Await 会暂停 Async 函数的执行，等待 Promise 完成</li>
+                <li>Async/Await 让异步代码看起来像同步代码，但不会阻塞主线程</li>
+                <li>错误处理可以使用 try/catch 块</li>
+            </ul>
+        </div>
+        
+        <div class="tab-content">
+            <h2>Generator 函数基础</h2>
+            <p>Generator 函数是 ES6 引入的一种异步编程解决方案，它是 Async/Await 的基础。</p>
+            
+            <h3>基本语法</h3>
+            <div class="code-container">
+                <span class="code-comment">// 定义 Generator 函数</span><br>
+                <span class="code-keyword">function</span>* <span class="code-function">myGenerator</span>() {<br>
+                &nbsp;&nbsp;<span class="code-keyword">yield</span> <span class="code-string">'Hello'</span>;<br>
+                &nbsp;&nbsp;<span class="code-keyword">yield</span> <span class="code-string">'World'</span>;<br>
+                &nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-string">'End'</span>;<br>
+                }<br>
+                <br>
+                <span class="code-comment">// 使用 Generator</span><br>
+                <span class="code-keyword">const</span> <span class="code-var">gen</span> = <span class="code-function">myGenerator</span>();<br>
+                <br>
+                <span class="code-function">console</span>.<span class="code-function">log</span>(gen.<span class="code-function">next</span>()); <span class="code-comment">// { value: 'Hello', done: false }</span><br>
+                <span class="code-function">console</span>.<span class="code-function">log</span>(gen.<span class="code-function">next</span>()); <span class="code-comment">// { value: 'World', done: false }</span><br>
+                <span class="code-function">console</span>.<span class="code-function">log</span>(gen.<span class="code-function">next</span>()); <span class="code-comment">// { value: 'End', done: true }</span>
+            </div>
+            
+            <h3>Generator 与异步操作</h3>
+            <div class="code-container">
+                <span class="code-keyword">function</span> <span class="code-function">asyncTask</span>(value, delay) {<br>
+                &nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-keyword">new</span> <span class="code-function">Promise</span>(<span class="code-function">resolve</span> => {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-function">setTimeout</span>(() => {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-function">resolve</span>(value);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;}, delay);<br>
+                &nbsp;&nbsp;});<br>
+                }<br>
+                <br>
+                <span class="code-keyword">function</span>* <span class="code-function">asyncGenerator</span>() {<br>
+                &nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">result1</span> = <span class="code-keyword">yield</span> <span class="code-function">asyncTask</span>(<span class="code-string">'First'</span>, 1000);<br>
+                &nbsp;&nbsp;<span class="code-function">console</span>.<span class="code-function">log</span>(<span class="code-var">result1</span>);<br>
+                &nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">result2</span> = <span class="code-keyword">yield</span> <span class="code-function">asyncTask</span>(<span class="code-string">'Second'</span>, 500);<br>
+                &nbsp;&nbsp;<span class="code-function">console</span>.<span class="code-function">log</span>(<span class="code-var">result2</span>);<br>
+                &nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-string">'Done'</span>;<br>
+                }<br>
+                <br>
+                <span class="code-comment">// 手动执行 Generator</span><br>
+                <span class="code-keyword">const</span> <span class="code-var">gen</span> = <span class="code-function">asyncGenerator</span>();<br>
+                <span class="code-keyword">const</span> <span class="code-var">promise1</span> = gen.<span class="code-function">next</span>().value;<br>
+                <span class="code-var">promise1</span>.<span class="code-function">then</span>(result1 => {<br>
+                &nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">promise2</span> = gen.<span class="code-function">next</span>(result1).value;<br>
+                &nbsp;&nbsp;<span class="code-var">promise2</span>.<span class="code-function">then</span>(result2 => {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;gen.<span class="code-function">next</span>(result2);<br>
+                &nbsp;&nbsp;});<br>
+                });
+            </div>
+            
+            <p>从上面的例子可以看出，手动执行 Generator 函数处理异步操作非常繁琐，这正是需要自动执行器的原因。</p>
+        </div>
+        
+        <div class="tab-content">
+            <h2>从 Generator 到 Async/Await</h2>
+            <p>下面展示如何将 Generator 函数转换为 Async/Await 语法：</p>
+            
+            <div class="comparison">
+                <div class="comparison-item">
+                    <h3>Generator + 执行器</h3>
+                    <div class="code-container">
+                        <span class="code-keyword">function</span>* <span class="code-function">fetchUserData</span>() {<br>
+                        &nbsp;&nbsp;<span class="code-keyword">try</span> {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">user</span> = <span class="code-keyword">yield</span> <span class="code-function">fetch</span>(<span class="code-string">'/api/user'</span>);<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">posts</span> = <span class="code-keyword">yield</span> <span class="code-function">fetch</span>(<span class="code-string">`/api/posts/${user.id}`</span>);<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">return</span> { user, posts };<br>
+                        &nbsp;&nbsp;} <span class="code-keyword">catch</span> (<span class="code-var">error</span>) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-function">console</span>.<span class="code-function">error</span>(<span class="code-string">'Error:'</span>, error);<br>
+                        &nbsp;&nbsp;}<br>
+                        }<br>
+                        <br>
+                        <span class="code-comment">// 需要执行器函数来运行</span><br>
+                        <span class="code-function">runGenerator</span>(fetchUserData);
+                    </div>
+                </div>
+                
+                <div class="comparison-item">
+                    <h3>Async/Await</h3>
+                    <div class="code-container">
+                        <span class="code-keyword">async function</span> <span class="code-function">fetchUserData</span>() {<br>
+                        &nbsp;&nbsp;<span class="code-keyword">try</span> {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">user</span> = <span class="code-keyword">await</span> <span class="code-function">fetch</span>(<span class="code-string">'/api/user'</span>);<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">posts</span> = <span class="code-keyword">await</span> <span class="code-function">fetch</span>(<span class="code-string">`/api/posts/${user.id}`</span>);<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">return</span> { user, posts };<br>
+                        &nbsp;&nbsp;} <span class="code-keyword">catch</span> (<span class="code-var">error</span>) {<br>
+                        &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-function">console</span>.<span class="code-function">error</span>(<span class="code-string">'Error:'</span>, error);<br>
+                        &nbsp;&nbsp;}<br>
+                        }<br>
+                        <br>
+                        <span class="code-comment">// 直接调用</span><br>
+                        <span class="code-function">fetchUserData</span>();
+                    </div>
+                </div>
+            </div>
+            
+            <h3>自动执行器原理</h3>
+            <p>Async/Await 本质上是在语言层面提供了 Generator 的自动执行器，其核心逻辑如下：</p>
+            
+            <div class="code-container">
+                <span class="code-keyword">function</span> <span class="code-function">asyncToGenerator</span>(genFunc) {<br>
+                &nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-keyword">function</span>(...args) {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">gen</span> = <span class="code-function">genFunc</span>(...args);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-keyword">new</span> <span class="code-function">Promise</span>((<span class="code-var">resolve</span>, <span class="code-var">reject</span>) => {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">function</span> <span class="code-function">step</span>(<span class="code-var">key</span>, <span class="code-var">arg</span>) {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">let</span> <span class="code-var">result</span>;<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">try</span> {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-var">result</span> = gen[<span class="code-var">key</span>](<span class="code-var">arg</span>);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} <span class="code-keyword">catch</span> (<span class="code-var">error</span>) {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-function">reject</span>(error);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">const</span> { value, done } = <span class="code-var">result</span>;<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">if</span> (done) {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-function">resolve</span>(value);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;} <span class="code-keyword">else</span> {<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-function">Promise</span>.<span class="code-function">resolve</span>(value).<span class="code-function">then</span>(<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-var">val</span> => <span class="code-function">step</span>(<span class="code-string">'next'</span>, <span class="code-var">val</span>),<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-var">err</span> => <span class="code-function">step</span>(<span class="code-string">'throw'</span>, <span class="code-var">err</span>)<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;}<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;<span class="code-function">step</span>(<span class="code-string">'next'</span>);<br>
+                &nbsp;&nbsp;&nbsp;&nbsp;});<br>
+                &nbsp;&nbsp;};<br>
+                }
+            </div>
+        </div>
+        
+        <div class="tab-content">
+            <h2>Async/Await 执行演示</h2>
+            <p>下面的演示展示了 Async/Await 函数的执行流程：</p>
+            
+            <div class="demo-box">
+                <div class="demo-controls">
+                    <button onclick="runDemo()">运行演示</button>
+                    <button onclick="resetDemo()">重置</button>
+                </div>
+                
+                <div class="output" id="demo-output">// 输出将显示在这里</div>
+                
+                <div class="execution-path">
+                    <h3>执行路径</h3>
+                    <div id="path-steps">
+                        <div class="path-step">
+                            <span class="step-number">1</span>
+                            <span>开始执行 async 函数</span>
+                        </div>
+                        <div class="path-step">
+                            <span class="step-number">2</span>
+                            <span>遇到第一个 await，暂停执行</span>
+                        </div>
+                        <div class="path-step">
+                            <span class="step-number">3</span>
+                            <span>Promise 解析完成，恢复执行</span>
+                        </div>
+                        <div class="path-step">
+                            <span class="step-number">4</span>
+                            <span>遇到第二个 await，再次暂停</span>
+                        </div>
+                        <div class="path-step">
+                            <span class="step-number">5</span>
+                            <span>Promise 解析完成，恢复执行</span>
+                        </div>
+                        <div class="path-step">
+                            <span class="step-number">6</span>
+                            <span>函数执行完成，返回最终结果</span>
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="legend">
+                    <div class="legend-item">
+                        <div class="legend-color legend-sync"></div>
+                        <span>同步执行</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color legend-async"></div>
+                        <span>异步操作</span>
+                    </div>
+                    <div class="legend-item">
+                        <div class="legend-color legend-await"></div>
+                        <span>await 暂停点</span>
+                    </div>
+                </div>
+            </div>
+            
+            <h3>演示代码</h3>
+            <div class="code-container">
+                <span class="code-keyword">async function</span> <span class="code-function">demoAsync</span>() {<br>
+                &nbsp;&nbsp;<span class="code-function">log</span>(<span class="code-string">'开始执行 async 函数'</span>);<br>
+                <br>
+                &nbsp;&nbsp;<span class="code-function">log</span>(<span class="code-string">'即将开始第一个异步操作'</span>);<br>
+                &nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">result1</span> = <span class="code-keyword">await</span> <span class="code-function">mockAsyncOperation</span>(<span class="code-string">'第一次操作'</span>, 1500);<br>
+                &nbsp;&nbsp;<span class="code-function">log</span>(<span class="code-string">`第一个操作完成: ${result1}`</span>);<br>
+                <br>
+                &nbsp;&nbsp;<span class="code-function">log</span>(<span class="code-string">'即将开始第二个异步操作'</span>);<br>
+                &nbsp;&nbsp;<span class="code-keyword">const</span> <span class="code-var">result2</span> = <span class="code-keyword">await</span> <span class="code-function">mockAsyncOperation</span>(<span class="code-string">'第二次操作'</span>, 1000);<br>
+                &nbsp;&nbsp;<span class="code-function">log</span>(<span class="code-string">`第二个操作完成: ${result2}`</span>);<br>
+                <br>
+                &nbsp;&nbsp;<span class="code-keyword">return</span> <span class="code-string">`最终结果: ${result1} - ${result2}`</span>;<br>
+                }<br>
+                <br>
+                <span class="code-function">demoAsync</span>().<span class="code-function">then</span>(<span class="code-var">result</span> => {<br>
+                &nbsp;&nbsp;<span class="code-function">log</span>(result);<br>
+                });
+            </div>
+        </div>
+        
+        <footer>
+            <p>Async/Await 实现原理演示 &copy; 2023</p>
+        </footer>
+    </div>
+
+    <script>
+        // 选项卡功能
+        function showTab(index) {
+            const tabs = document.querySelectorAll('.tab-content');
+            const buttons = document.querySelectorAll('.tab-btn');
+            
+            tabs.forEach(tab => tab.classList.remove('active'));
+            buttons.forEach(btn => btn.classList.remove('active'));
+            
+            tabs[index].classList.add('active');
+            buttons[index].classList.add('active');
+        }
+        
+        // 演示功能
+        function log(message) {
+            const output = document.getElementById('demo-output');
+            output.textContent += message + '\n';
+            output.scrollTop = output.scrollHeight;
+        }
+        
+        function mockAsyncOperation(name, delay) {
+            log(`开始异步操作: ${name} (${delay}ms)`);
+            return new Promise(resolve => {
+                setTimeout(() => {
+                    resolve(`${name} 完成`);
+                }, delay);
+            });
+        }
+        
+        async function demoAsync() {
+            log('开始执行 async 函数');
+            
+            log('即将开始第一个异步操作');
+            const result1 = await mockAsyncOperation('第一次操作', 1500);
+            log(`第一个操作完成: ${result1}`);
+            
+            log('即将开始第二个异步操作');
+            const result2 = await mockAsyncOperation('第二次操作', 1000);
+            log(`第二个操作完成: ${result2}`);
+            
+            return `最终结果: ${result1} - ${result2}`;
+        }
+        
+        function runDemo() {
+            const output = document.getElementById('demo-output');
+            output.textContent = '';
+            
+            const steps = document.querySelectorAll('.path-step');
+            steps.forEach(step => {
+                step.querySelector('.step-number').className = 'step-number';
+            });
+            
+            steps[0].querySelector('.step-number').classList.add('step-active');
+            
+            demoAsync().then(result => {
+                log(result);
+                steps[5].querySelector('.step-number').classList.add('step-completed');
+            });
+            
+            // 模拟执行路径高亮
+            setTimeout(() => {
+                steps[0].querySelector('.step-number').classList.remove('step-active');
+                steps[1].querySelector('.step-number').classList.add('step-active');
+            }, 500);
+            
+            setTimeout(() => {
+                steps[1].querySelector('.step-number').classList.remove('step-active');
+                steps[2].querySelector('.step-number').classList.add('step-active');
+            }, 2000);
+            
+            setTimeout(() => {
+                steps[2].querySelector('.step-number').classList.remove('step-active');
+                steps[3].querySelector('.step-number').classList.add('step-active');
+            }, 2200);
+            
+            setTimeout(() => {
+                steps[3].querySelector('.step-number').classList.remove('step-active');
+                steps[4].querySelector('.step-number').classList.add('step-active');
+            }, 3200);
+            
+            setTimeout(() => {
+                steps[4].querySelector('.step-number').classList.remove('step-active');
+                steps[5].querySelector('.step-number').classList.add('step-active');
+            }, 3500);
+        }
+        
+        function resetDemo() {
+            const output = document.getElementById('demo-output');
+            output.textContent = '// 输出将显示在这里\n';
+            
+            const steps = document.querySelectorAll('.path-step');
+            steps.forEach(step => {
+                step.querySelector('.step-number').className = 'step-number';
+            });
+        }
+    </script>
+</body>
+</html>
