@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Proxy 和 Reflect API 演示</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; background: #f5f5f5; }
+        .container { max-width: 1000px; margin: 0 auto; background: white; padding: 20px; border-radius: 10px; }
+        .demo-section { margin: 20px 0; border: 1px solid #ddd; border-radius: 8px; overflow: hidden; }
+        .demo-header { background: #4CAF50; color: white; padding: 15px; }
+        .demo-content { padding: 20px; }
+        .btn { background: #2196F3; color: white; border: none; padding: 10px 20px; margin: 5px; border-radius: 5px; cursor: pointer; }
+        .btn:hover { background: #1976D2; }
+        .output { background: #2c3e50; color: #ecf0f1; padding: 15px; border-radius: 5px; font-family: monospace; white-space: pre-wrap; max-height: 300px; overflow-y: auto; }
+        .input-group { margin: 10px 0; }
+        .input-group input { padding: 8px; margin: 0 10px; border: 1px solid #ddd; border-radius: 4px; }
+        .stats { display: flex; justify-content: space-around; background: #f8f9fa; padding: 15px; border-radius: 5px; margin: 10px 0; }
+        .stat { text-align: center; }
+        .stat-value { font-size: 1.5em; font-weight: bold; color: #2196F3; }
+        .stat-label { font-size: 0.9em; color: #666; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔮 Proxy 和 Reflect API 演示</h1>
+        
+        <!-- 基础代理演示 -->
+        <div class="demo-section">
+            <div class="demo-header">
+                <h3>🎯 基础代理演示</h3>
+            </div>
+            <div class="demo-content">
+                <div class="input-group">
+                    <input type="text" id="userName" placeholder="姓名">
+                    <input type="number" id="userAge" placeholder="年龄">
+                    <button class="btn" onclick="updateUser()">更新用户</button>
+                    <button class="btn" onclick="clearBasicLog()">清空日志</button>
+                </div>
+                <div id="basicOutput" class="output">点击按钮开始演示...</div>
+            </div>
+        </div>
+
+        <!-- 响应式数据演示 -->
+        <div class="demo-section">
+            <div class="demo-header">
+                <h3>⚡ 响应式数据演示</h3>
+            </div>
+            <div class="demo-content">
+                <div class="input-group">
+                    <button class="btn" onclick="incrementCount()">计数 +1</button>
+                    <button class="btn" onclick="decrementCount()">计数 -1</button>
+                    <button class="btn" onclick="addWatcher()">添加监听器</button>
+                </div>
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-value" id="countDisplay">0</div>
+                        <div class="stat-label">当前计数</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="watcherCount">0</div>
+                        <div class="stat-label">监听器数量</div>
+                    </div>
+                </div>
+                <div id="reactiveOutput" class="output">响应式系统就绪...</div>
+            </div>
+        </div>
+
+        <!-- 缓存代理演示 -->
+        <div class="demo-section">
+            <div class="demo-header">
+                <h3>💾 智能缓存系统</h3>
+            </div>
+            <div class="demo-content">
+                <div class="input-group">
+                    <input type="number" id="calcInput" placeholder="计算值" value="5">
+                    <button class="btn" onclick="performCalculation()">执行计算</button>
+                    <button class="btn" onclick="clearCache()">清空缓存</button>
+                </div>
+                <div class="stats">
+                    <div class="stat">
+                        <div class="stat-value" id="cacheHits">0</div>
+                        <div class="stat-label">缓存命中</div>
+                    </div>
+                    <div class="stat">
+                        <div class="stat-value" id="cacheMisses">0</div>
+                        <div class="stat-label">缓存未命中</div>
+                    </div>
+                </div>
+                <div id="cacheOutput" class="output">缓存系统就绪...</div>
+            </div>
+        </div>
+
+        <!-- Reflect 演示 -->
+        <div class="demo-section">
+            <div class="demo-header">
+                <h3>🔍 Reflect 方法演示</h3>
+            </div>
+            <div class="demo-content">
+                <div class="input-group">
+                    <button class="btn" onclick="reflectGet()">Reflect.get()</button>
+                    <button class="btn" onclick="reflectSet()">Reflect.set()</button>
+                    <button class="btn" onclick="reflectHas()">Reflect.has()</button>
+                    <button class="btn" onclick="reflectDelete()">Reflect.delete()</button>
+                </div>
+                <div id="reflectOutput" class="output">选择一个 Reflect 方法进行演示...</div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 全局变量
+        let logOutput = '';
+        let reactiveData = null;
+        let cacheStats = { hits: 0, misses: 0 };
+        let watcherCount = 0;
+
+        // 日志函数
+        function log(message, type = 'info') {
+            const colors = { info: '#3498db', success: '#27ae60', error: '#e74c3c', warning: '#f39c12' };
+            logOutput += `<span style="color: ${colors[type]}">[${new Date().toLocaleTimeString()}]</span> ${message}\n`;
+        }
+
+        function updateOutput(id) {
+            document.getElementById(id).innerHTML = logOutput;
+        }
+
+        function clearBasicLog() {
+            logOutput = '';
+            updateOutput('basicOutput');
+        }
+
+        // 基础代理演示
+        let userProxy = null;
+
+        function initUserProxy() {
+            const user = { name: '', age: 0 };
+            userProxy = new Proxy(user, {
+                get(target, property) {
+                    log(`📖 读取: ${property} = ${target[property]}`);
+                    return Reflect.get(target, property);
+                },
+                set(target, property, value) {
+                    if (property === 'age' && (value < 0 || value > 120)) {
+                        log(`❌ 年龄验证失败: ${value}`, 'error');
+                        return false;
+                    }
+                    log(`✏️ 设置: ${property} = ${value}`, 'success');
+                    return Reflect.set(target, property, value);
+                }
+            });
+        }
+
+        function updateUser() {
+            if (!userProxy) initUserProxy();
+            const name = document.getElementById('userName').value;
+            const age = parseInt(document.getElementById('userAge').value);
+            
+            if (name) userProxy.name = name;
+            if (!isNaN(age)) userProxy.age = age;
+            
+            updateOutput('basicOutput');
+        }
+
+        // 响应式数据演示
+        function initReactive() {
+            let activeEffect = null;
+            const targetMap = new WeakMap();
+
+            function track(target, key) {
+                if (!activeEffect) return;
+                let depsMap = targetMap.get(target);
+                if (!depsMap) targetMap.set(target, (depsMap = new Map()));
+                let dep = depsMap.get(key);
+                if (!dep) depsMap.set(key, (dep = new Set()));
+                dep.add(activeEffect);
+            }
+
+            function trigger(target, key) {
+                const depsMap = targetMap.get(target);
+                if (!depsMap) return;
+                const dep = depsMap.get(key);
+                if (dep) dep.forEach(effect => effect());
+            }
+
+            function effect(fn) {
+                activeEffect = fn;
+                fn();
+                activeEffect = null;
+            }
+
+            reactiveData = new Proxy({ count: 0 }, {
+                get(target, key) {
+                    track(target, key);
+                    return Reflect.get(target, key);
+                },
+                set(target, key, value) {
+                    const result = Reflect.set(target, key, value);
+                    trigger(target, key);
+                    return result;
+                }
+            });
+
+            effect(() => {
+                document.getElementById('countDisplay').textContent = reactiveData.count;
+                logOutput = `📊 计数更新: ${reactiveData.count}\n`;
+                updateOutput('reactiveOutput');
+            });
+        }
+
+        function incrementCount() {
+            if (!reactiveData) initReactive();
+            reactiveData.count++;
+        }
+
+        function decrementCount() {
+            if (!reactiveData) initReactive();
+            reactiveData.count--;
+        }
+
+        function addWatcher() {
+            if (!reactiveData) initReactive();
+            watcherCount++;
+            document.getElementById('watcherCount').textContent = watcherCount;
+            log(`👀 添加监听器 #${watcherCount}`, 'success');
+            updateOutput('reactiveOutput');
+        }
+
+        // 缓存代理演示
+        let cachedCalc = null;
+
+        function initCache() {
+            const cache = new Map();
+            
+            function expensiveCalc(n) {
+                let result = 0;
+                for (let i = 0; i < 100000; i++) result += Math.sqrt(n);
+                return result;
+            }
+
+            cachedCalc = new Proxy(expensiveCalc, {
+                apply(target, thisArg, args) {
+                    const key = JSON.stringify(args);
+                    if (cache.has(key)) {
+                        cacheStats.hits++;
+                        log(`🎯 缓存命中: ${key}`, 'success');
+                        return cache.get(key);
+                    }
+                    cacheStats.misses++;
+                    log(`💫 缓存未命中: ${key}`, 'warning');
+                    const result = Reflect.apply(target, thisArg, args);
+                    cache.set(key, result);
+                    return result;
+                }
+            });
+
+            cachedCalc.clearCache = () => {
+                cache.clear();
+                cacheStats = { hits: 0, misses: 0 };
+                log('🧹 缓存已清空', 'info');
+            };
+        }
+
+        function performCalculation() {
+            if (!cachedCalc) initCache();
+            const input = parseInt(document.getElementById('calcInput').value) || 5;
+            const result = cachedCalc(input);
+            
+            document.getElementById('cacheHits').textContent = cacheStats.hits;
+            document.getElementById('cacheMisses').textContent = cacheStats.misses;
+            
+            log(`📊 计算结果: ${result.toFixed(2)}`, 'info');
+            updateOutput('cacheOutput');
+        }
+
+        function clearCache() {
+            if (cachedCalc) {
+                cachedCalc.clearCache();
+                document.getElementById('cacheHits').textContent = 0;
+                document.getElementById('cacheMisses').textContent = 0;
+                updateOutput('cacheOutput');
+            }
+        }
+
+        // Reflect 演示
+        let testObj = { a: 1, b: 2, c: 3 };
+
+        function reflectGet() {
+            logOutput = '';
+            log(`🔍 Reflect.get() 演示:`);
+            log(`对象: ${JSON.stringify(testObj)}`);
+            log(`Reflect.get(obj, 'a'): ${Reflect.get(testObj, 'a')}`, 'success');
+            log(`Reflect.get(obj, 'x'): ${Reflect.get(testObj, 'x')}`, 'warning');
+            updateOutput('reflectOutput');
+        }
+
+        function reflectSet() {
+            logOutput = '';
+            log(`✏️ Reflect.set() 演示:`);
+            const success = Reflect.set(testObj, 'd', 4);
+            log(`Reflect.set(obj, 'd', 4): ${success}`, 'success');
+            log(`更新后: ${JSON.stringify(testObj)}`);
+            updateOutput('reflectOutput');
+        }
+
+        function reflectHas() {
+            logOutput = '';
+            log(`🔍 Reflect.has() 演示:`);
+            log(`Reflect.has(obj, 'a'): ${Reflect.has(testObj, 'a')}`, 'success');
+            log(`Reflect.has(obj, 'z'): ${Reflect.has(testObj, 'z')}`, 'warning');
+            updateOutput('reflectOutput');
+        }
+
+        function reflectDelete() {
+            logOutput = '';
+            log(`🗑️ Reflect.deleteProperty() 演示:`);
+            const success = Reflect.deleteProperty(testObj, 'c');
+            log(`Reflect.deleteProperty(obj, 'c'): ${success}`, 'success');
+            log(`删除后: ${JSON.stringify(testObj)}`);
+            updateOutput('reflectOutput');
+        }
+    </script>
+</body>
+</html>
